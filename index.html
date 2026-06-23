@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#4F46E5" />
+  <title>כרטיס בית ספרי</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Design tokens ─── */
+    :root {
+      --c-bg:        #F0F4FF;
+      --c-surface:   #FFFFFF;
+      --c-primary:   #4F46E5;
+      --c-primary-d: #3730A3;
+      --c-accent:    #10B981;
+      --c-danger:    #EF4444;
+      --c-text:      #1E1B4B;
+      --c-muted:     #6B7280;
+      --c-border:    #E5E7EB;
+      --radius:      16px;
+      --shadow:      0 4px 24px rgba(79,70,229,.10);
+      --shadow-sm:   0 1px 4px rgba(0,0,0,.07);
+      --transition:  .2s ease;
+    }
+
+    /* ─── Reset & base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Heebo', sans-serif;
+      background: var(--c-bg);
+      color: var(--c-text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ─── Auth screen ─── */
+    #auth-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: linear-gradient(140deg, #4F46E5 0%, #7C3AED 100%);
+    }
+    .auth-card {
+      background: var(--c-surface);
+      border-radius: var(--radius);
+      padding: 40px 32px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.18);
+    }
+    .auth-logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .auth-logo .logo-icon {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, #4F46E5, #7C3AED);
+      border-radius: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      font-size: 30px;
+    }
+    .auth-logo h1 { font-size: 22px; font-weight: 800; color: var(--c-text); }
+    .auth-logo p  { font-size: 13px; color: var(--c-muted); margin-top: 4px; }
+
+    /* ─── App shell ─── */
+    #app-screen { display: none; min-height: 100vh; flex-direction: column; }
+    #app-screen.visible { display: flex; }
+
+    /* Top bar */
+    .topbar {
+      background: var(--c-surface);
+      border-bottom: 1px solid var(--c-border);
+      padding: 0 20px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+    .topbar-brand { font-size: 17px; font-weight: 800; color: var(--c-primary); }
+    .topbar-user  { font-size: 12px; color: var(--c-muted); text-align: left; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-logout {
+      background: none; border: none; cursor: pointer;
+      color: var(--c-muted); font-size: 13px; padding: 6px 10px;
+      border-radius: 8px; transition: var(--transition);
+    }
+    .btn-logout:hover { background: var(--c-bg); color: var(--c-danger); }
+
+    /* Tab nav */
+    .tab-nav {
+      display: flex;
+      background: var(--c-surface);
+      border-bottom: 1px solid var(--c-border);
+    }
+    .tab-btn {
+      flex: 1; padding: 14px 8px 12px;
+      border: none; background: none; cursor: pointer;
+      font-family: 'Heebo', sans-serif;
+      font-size: 13px; font-weight: 600; color: var(--c-muted);
+      border-bottom: 3px solid transparent;
+      transition: var(--transition);
+    }
+    .tab-btn.active { color: var(--c-primary); border-bottom-color: var(--c-primary); }
+    .tab-btn .tab-icon { display: block; font-size: 20px; margin-bottom: 2px; }
+
+    /* Content area */
+    .tab-content { display: none; padding: 20px; max-width: 600px; margin: 0 auto; width: 100%; }
+    .tab-content.active { display: block; }
+
+    /* ─── Shared components ─── */
+    .card {
+      background: var(--c-surface);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 16px;
+    }
+    .card-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: var(--c-text); }
+    .card-title .emoji { margin-left: 6px; }
+
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--c-muted); margin-bottom: 6px; }
+    input[type="text"], input[type="email"], input[type="password"], input[type="number"], select, textarea {
+      width: 100%; padding: 11px 14px;
+      border: 1.5px solid var(--c-border);
+      border-radius: 10px; font-size: 14px;
+      font-family: 'Heebo', sans-serif;
+      color: var(--c-text); background: var(--c-surface);
+      transition: border-color var(--transition);
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--c-primary); }
+    .form-group { margin-bottom: 14px; }
+
+    .btn {
+      width: 100%; padding: 13px;
+      border: none; border-radius: 12px;
+      font-family: 'Heebo', sans-serif;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: var(--transition);
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-primary   { background: var(--c-primary);   color: #fff; }
+    .btn-primary:hover   { background: var(--c-primary-d); }
+    .btn-success   { background: var(--c-accent);    color: #fff; }
+    .btn-success:hover   { filter: brightness(1.05); }
+    .btn-danger    { background: var(--c-danger);    color: #fff; }
+    .btn-danger:hover    { filter: brightness(1.05); }
+    .btn-outline   { background: transparent; border: 2px solid var(--c-primary); color: var(--c-primary); }
+    .btn-outline:hover   { background: var(--c-primary); color: #fff; }
+    .btn:disabled  { opacity: .5; cursor: not-allowed; }
+    .btn-sm { width: auto; padding: 8px 16px; font-size: 13px; border-radius: 8px; }
+
+    /* NFC pulse button */
+    .nfc-btn-wrap { position: relative; display: flex; justify-content: center; margin: 8px 0; }
+    .nfc-pulse-ring {
+      position: absolute; inset: -6px;
+      border-radius: 50%; border: 3px solid var(--c-primary);
+      opacity: 0; animation: none;
+    }
+    .nfc-pulse-ring.scanning { animation: pulse-ring 1.4s ease-out infinite; }
+    @keyframes pulse-ring {
+      0%   { transform: scale(.9); opacity: .7; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+    .btn-nfc {
+      width: 100%; padding: 16px;
+      background: linear-gradient(135deg, var(--c-primary), #7C3AED);
+      color: #fff; border: none; border-radius: 14px;
+      font-family: 'Heebo', sans-serif; font-size: 16px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 10px; transition: var(--transition);
+    }
+    .btn-nfc:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-nfc .nfc-icon { font-size: 22px; }
+
+    /* NFC status badge */
+    .nfc-status {
+      text-align: center; padding: 10px;
+      border-radius: 10px; font-size: 13px; font-weight: 600;
+      margin-top: 10px; display: none;
+    }
+    .nfc-status.scanning { display: block; background: #EEF2FF; color: var(--c-primary); }
+    .nfc-status.success  { display: block; background: #D1FAE5; color: #065F46; }
+    .nfc-status.error    { display: block; background: #FEE2E2; color: #991B1B; }
+
+    /* Student card preview */
+    .student-preview {
+      border-radius: var(--radius); padding: 18px 20px;
+      background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+      color: #fff; display: none;
+    }
+    .student-preview.visible { display: block; }
+    .sp-label { font-size: 11px; opacity: .75; letter-spacing: .5px; text-transform: uppercase; }
+    .sp-name  { font-size: 22px; font-weight: 800; margin: 4px 0 2px; }
+    .sp-meta  { font-size: 13px; opacity: .85; }
+    .sp-balance-row { display: flex; align-items: flex-end; gap: 6px; margin-top: 14px; }
+    .sp-balance-label { font-size: 12px; opacity: .75; margin-bottom: 2px; }
+    .sp-balance { font-size: 36px; font-weight: 800; line-height: 1; }
+    .sp-unit    { font-size: 14px; opacity: .85; margin-bottom: 4px; }
+
+    /* Transaction list */
+    .tx-list { list-style: none; }
+    .tx-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 11px 0; border-bottom: 1px solid var(--c-border);
+      font-size: 13px;
+    }
+    .tx-item:last-child { border-bottom: none; }
+    .tx-desc { color: var(--c-text); font-weight: 500; }
+    .tx-sub  { color: var(--c-muted); font-size: 11px; margin-top: 2px; }
+    .tx-amount { font-weight: 700; font-size: 15px; }
+    .tx-amount.positive { color: var(--c-accent); }
+    .tx-amount.negative { color: var(--c-danger); }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: #1E1B4B; color: #fff; padding: 12px 24px;
+      border-radius: 100px; font-size: 14px; font-weight: 600;
+      z-index: 999; transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+      white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.success { background: #065F46; }
+    #toast.error   { background: #991B1B; }
+
+    /* Divider */
+    .divider {
+      display: flex; align-items: center; gap: 10px;
+      margin: 16px 0; color: var(--c-muted); font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--c-border);
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Reason chips */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .chip {
+      padding: 6px 14px; border-radius: 100px;
+      border: 1.5px solid var(--c-border);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: var(--transition); color: var(--c-muted); background: var(--c-surface);
+    }
+    .chip.active { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+
+    /* Misc */
+    .text-center { text-align: center; }
+    .text-muted  { color: var(--c-muted); font-size: 13px; }
+    .mt-8  { margin-top: 8px; }
+    .mt-12 { margin-top: 12px; }
+    .mt-16 { margin-top: 16px; }
+    .row   { display: flex; gap: 12px; }
+    .row > * { flex: 1; }
+
+    /* Responsive */
+    @media (max-width: 400px) {
+      .auth-card { padding: 28px 20px; }
+      .tab-btn   { font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ AUTH SCREEN ══════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo-icon">🏫</div>
+      <h1>כרטיס בית ספרי</h1>
+      <p>מערכת נקודות ותגמולים לתלמידים</p>
+    </div>
+    <div class="form-group">
+      <label for="auth-email">אימייל</label>
+      <input type="email" id="auth-email" placeholder="teacher@school.edu" autocomplete="username" />
+    </div>
+    <div class="form-group">
+      <label for="auth-password">סיסמה</label>
+      <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <button class="btn btn-primary mt-12" id="btn-login">
+      <span id="login-label">כניסה</span>
+    </button>
+    <p id="auth-error" class="nfc-status error mt-8"></p>
+  </div>
+</div>
+
+<!-- ══════════════ APP SCREEN ══════════════ -->
+<div id="app-screen">
+
+  <div class="topbar">
+    <span class="topbar-brand">🏫 כרטיס בית ספרי</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="topbar-user" id="user-email-display"></span>
+      <button class="btn-logout" id="btn-logout">יציאה</button>
+    </div>
+  </div>
+
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="register">
+      <span class="tab-icon">➕</span>רישום
+    </button>
+    <button class="tab-btn" data-tab="teacher">
+      <span class="tab-icon">⭐</span>מורה
+    </button>
+    <button class="tab-btn" data-tab="store">
+      <span class="tab-icon">🛒</span>חנות
+    </button>
+  </nav>
+
+  <!-- ── TAB: Register ── -->
+  <div class="tab-content active" id="tab-register">
+
+    <div class="card">
+      <p class="card-title"><span class="emoji">➕</span>רישום תלמיד חדש</p>
+      <div class="row">
+        <div class="form-group">
+          <label for="reg-name">שם מלא</label>
+          <input type="text" id="reg-name" placeholder="ישראל ישראלי" />
+        </div>
+        <div class="form-group">
+          <label for="reg-grade">כיתה</label>
+          <select id="reg-grade">
+            <option value="">בחר...</option>
+            <option>א׳</option><option>ב׳</option><option>ג׳</option>
+            <option>ד׳</option><option>ה׳</option><option>ו׳</option>
+            <option>ז׳</option><option>ח׳</option><option>ט׳</option>
+            <option>י׳</option><option>י״א</option><option>י״ב</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn-nfc" id="btn-scan-register">
+        <span class="nfc-icon">📡</span>
+        <span id="scan-reg-label">סרוק תג NFC לשיוך</span>
+      </button>
+      <p id="nfc-status-register" class="nfc-status"></p>
+
+      <div class="divider">או הזן UID ידנית</div>
+      <div class="form-group">
+        <label for="reg-uid-manual">UID תג NFC (ידני)</label>
+        <input type="text" id="reg-uid-manual" placeholder="04:a3:2b:cc:dd:ee:ff" />
+      </div>
+      <button class="btn btn-primary" id="btn-register-submit">רשום תלמיד</button>
+    </div>
+
+    <div class="card" id="reg-result-card" style="display:none">
+      <p class="card-title"><span class="emoji">✅</span>תלמיד נרשם בהצלחה</p>
+      <div class="student-preview visible" id="reg-student-preview"></div>
+    </div>
+
+  </div>
+
+  <!-- ── TAB: Teacher ── -->
+  <div class="tab-content" id="tab-teacher">
+
+    <div class="card">
+      <p class="card-title"><span class="emoji">📡</span>זיהוי תלמיד</p>
+      <button class="btn-nfc" id="btn-scan-teacher">
+        <span class="nfc-icon">📡</span>
+        <span id="scan-teacher-label">הצמד כרטיס לזיהוי</span>
+      </button>
+      <p id="nfc-status-teacher" class="nfc-status"></p>
+
+      <div class="divider">או הזן UID ידנית</div>
+      <div class="form-group">
+        <label for="teacher-uid-manual">UID תג NFC</label>
+        <input type="text" id="teacher-uid-manual" placeholder="04:a3:2b:cc:dd:ee:ff" />
+      </div>
+      <button class="btn btn-outline btn-sm" id="btn-teacher-manual-lookup">אשר UID</button>
+    </div>
+
+    <div id="teacher-student-section" style="display:none">
+      <div class="student-preview visible" id="teacher-student-preview"></div>
+
+      <div class="card mt-16">
+        <p class="card-title"><span class="emoji">⭐</span>הענק נקודות</p>
+        <div class="form-group">
+          <label>כמות נקודות</label>
+          <input type="number" id="teacher-points" min="1" max="500" placeholder="למשל: 10" />
+        </div>
+        <div class="form-group">
+          <label>סיבה</label>
+          <div class="chips" id="reason-chips">
+            <span class="chip active" data-reason="הצטיינות בשיעור">הצטיינות בשיעור</span>
+            <span class="chip" data-reason="עזרה לחבר">עזרה לחבר</span>
+            <span class="chip" data-reason="הגשת מטלה">הגשת מטלה</span>
+            <span class="chip" data-reason="השתתפות בפרויקט">פרויקט</span>
+            <span class="chip" data-reason="התנהגות מופתית">התנהגות מופתית</span>
+            <span class="chip" data-reason="אחר">אחר</span>
+          </div>
+          <input type="text" id="teacher-reason-custom" placeholder="תאר את הסיבה..." style="display:none" />
+        </div>
+        <button class="btn btn-success" id="btn-award-points">הענק נקודות ✨</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── TAB: Store ── -->
+  <div class="tab-content" id="tab-store">
+
+    <div class="card">
+      <p class="card-title"><span class="emoji">🛒</span>תשלום בחנות</p>
+      <div class="form-group">
+        <label for="store-cost">עלות המוצר (נקודות)</label>
+        <input type="number" id="store-cost" min="1" placeholder="למשל: 25" />
+      </div>
+      <div class="form-group">
+        <label for="store-item">תיאור המוצר</label>
+        <input type="text" id="store-item" placeholder="למשל: עיפרון שחור" />
+      </div>
+
+      <button class="btn-nfc" id="btn-scan-store">
+        <span class="nfc-icon">📡</span>
+        <span id="scan-store-label">הצמד כרטיס לתשלום</span>
+      </button>
+      <p id="nfc-status-store" class="nfc-status"></p>
+
+      <div class="divider">או הזן UID ידנית</div>
+      <div class="form-group">
+        <label for="store-uid-manual">UID תג NFC</label>
+        <input type="text" id="store-uid-manual" placeholder="04:a3:2b:cc:dd:ee:ff" />
+      </div>
+      <button class="btn btn-outline btn-sm" id="btn-store-manual-pay">שלם עם UID ידני</button>
+    </div>
+
+    <div class="card" id="store-result-card" style="display:none">
+      <div class="student-preview visible" id="store-student-preview"></div>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><span class="emoji">📋</span>עסקאות אחרונות</p>
+      <ul class="tx-list" id="tx-list"><li class="text-muted">טוען...</li></ul>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Firebase SDK (compat mode — works inline without bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
