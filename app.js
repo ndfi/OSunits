@@ -3,39 +3,30 @@
    ════════════════════════════════════════════════════════ */
 
 // ─── 1. Firebase configuration ───────────────────────────
-// ⚠️  החלף את הערכים האלה בפרטי פרויקט Firebase שלך
-//     (מצא אותם ב-Firebase Console → Project Settings → General)
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// ✅ משתמש ב-Firebase Compat SDK (נטען מה-<script> ב-HTML)
+//    אין import — הספריות כבר זמינות כ-globals: firebase.*
 const firebaseConfig = {
-  apiKey: "AIzaSyAIYJa_CSmJ0zXgv_7BspsZ8PSq7NIoeMY",
-  authDomain: "osunits-638ff.firebaseapp.com",
-  projectId: "osunits-638ff",
-  storageBucket: "osunits-638ff.firebasestorage.app",
+  apiKey:            "AIzaSyAIYJa_CSmJ0zXgv_7BspsZ8PSq7NIoeMY",
+  authDomain:        "osunits-638ff.firebaseapp.com",
+  projectId:         "osunits-638ff",
+  storageBucket:     "osunits-638ff.firebasestorage.app",
   messagingSenderId: "896549318068",
-  appId: "1:896549318068:web:a5b96ecdae6a15d67cd6e1",
-  measurementId: "G-Q7NN0RD4Q9"
+  appId:             "1:896549318068:web:a5b96ecdae6a15d67cd6e1",
+  measurementId:     "G-Q7NN0RD4Q9"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
 
 // ─── 2. Global state ────────────────────────────────────
-let currentUser       = null;   // Firebase Auth user
-let nfcAbortController = null;  // for stopping NDEFReader.scan()
-let activeTeacherUID  = null;   // UID loaded on teacher tab
-let selectedReason    = "הצטיינות בשיעור";
+let currentUser        = null;
+let nfcAbortController = null;
+let activeTeacherUID   = null;
+let selectedReason     = "הצטיינות בשיעור";
 
 // ─── 3. Utility helpers ─────────────────────────────────
 
-/** Show a temporary toast message */
 function showToast(msg, type = "default", duration = 3000) {
   const t = document.getElementById("toast");
   t.textContent = msg;
@@ -44,22 +35,17 @@ function showToast(msg, type = "default", duration = 3000) {
   t._timer = setTimeout(() => t.className = "", duration);
 }
 
-/** Format a Firestore Timestamp (or Date) to Hebrew locale string */
 function fmtDate(ts) {
   const d = ts?.toDate ? ts.toDate() : new Date(ts);
   return d.toLocaleString("he-IL", { day:"2-digit", month:"2-digit", year:"2-digit",
                                      hour:"2-digit", minute:"2-digit" });
 }
 
-/** Convert raw NFC serial bytes to hex string: "04:a3:2b:…" */
 function serialBytesToHex(serialNumber) {
-  // serialNumber from NDEFReader is a string like "04a32b..."
-  // Some browsers return it as colon-separated already; normalise:
   const clean = serialNumber.replace(/[^0-9a-fA-F]/g, "");
   return clean.match(/.{1,2}/g).join(":").toLowerCase();
 }
 
-/** Set status badge on a given element */
 function setNfcStatus(elementId, state, msg) {
   const el = document.getElementById(elementId);
   el.className = "nfc-status " + state;
@@ -67,7 +53,6 @@ function setNfcStatus(elementId, state, msg) {
   if (state === "") el.style.display = "none";
 }
 
-/** Build the student card HTML */
 function studentCardHTML(name, grade, balance) {
   return `
     <span class="sp-label">תלמיד</span>
@@ -82,13 +67,6 @@ function studentCardHTML(name, grade, balance) {
 
 // ─── 4. NFC core ────────────────────────────────────────
 
-/**
- * Launch Web NFC scan.
- * @param {string} statusElId  - element id for status text
- * @param {string} btnLabelId  - element id for button label
- * @param {function} onUID     - callback(uid: string)
- * @returns {Promise}          - resolves once a tag is read
- */
 async function scanNFC(statusElId, btnLabelId, onUID) {
   if (!("NDEFReader" in window)) {
     setNfcStatus(statusElId, "error",
@@ -96,7 +74,6 @@ async function scanNFC(statusElId, btnLabelId, onUID) {
     return;
   }
 
-  // Stop any previous scan
   if (nfcAbortController) {
     nfcAbortController.abort();
     nfcAbortController = null;
@@ -115,7 +92,6 @@ async function scanNFC(statusElId, btnLabelId, onUID) {
       const uid = serialBytesToHex(serialNumber);
       setNfcStatus(statusElId, "success", `✅ זוהה: ${uid}`);
       document.getElementById(btnLabelId).textContent = "סרוק שוב";
-      // Stop listening after first read
       nfcAbortController.abort();
       nfcAbortController = null;
       onUID(uid);
@@ -126,7 +102,7 @@ async function scanNFC(statusElId, btnLabelId, onUID) {
     });
 
   } catch (err) {
-    if (err.name === "AbortError") return; // user cancelled — silent
+    if (err.name === "AbortError") return;
     console.error("NFC error:", err);
     const msg = err.name === "NotAllowedError"
       ? "⚠️ ההרשאה ל-NFC נדחתה. אנא אפשר גישה והפעל מחדש."
@@ -135,7 +111,6 @@ async function scanNFC(statusElId, btnLabelId, onUID) {
   }
 }
 
-/** Stop any active NFC scan */
 function stopNFC(btnLabelId, originalLabel) {
   if (nfcAbortController) {
     nfcAbortController.abort();
@@ -165,13 +140,13 @@ document.getElementById("btn-login").addEventListener("click", async () => {
 
   try {
     await auth.signInWithEmailAndPassword(email, password);
-    // onAuthStateChanged handles the rest
   } catch (err) {
     const msgs = {
-      "auth/user-not-found":  "משתמש לא נמצא.",
-      "auth/wrong-password":  "סיסמה שגויה.",
-      "auth/invalid-email":   "כתובת אימייל לא תקינה.",
-      "auth/too-many-requests":"יותר מדי ניסיונות. נסה שוב מאוחר יותר."
+      "auth/user-not-found":    "משתמש לא נמצא.",
+      "auth/wrong-password":    "סיסמה שגויה.",
+      "auth/invalid-email":     "כתובת אימייל לא תקינה.",
+      "auth/invalid-credential":"אימייל או סיסמה שגויים.",
+      "auth/too-many-requests": "יותר מדי ניסיונות. נסה שוב מאוחר יותר."
     };
     errEl.textContent = msgs[err.code] || `שגיאה: ${err.message}`;
     errEl.style.display = "block";
@@ -186,21 +161,19 @@ document.getElementById("btn-logout").addEventListener("click", async () => {
   await auth.signOut();
 });
 
-// Enter key on password field → login
 document.getElementById("auth-password").addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("btn-login").click();
 });
 
-// Auth state listener
 auth.onAuthStateChanged(user => {
   currentUser = user;
   if (user) {
-    document.getElementById("auth-screen").style.display  = "none";
+    document.getElementById("auth-screen").style.display = "none";
     document.getElementById("app-screen").classList.add("visible");
     document.getElementById("user-email-display").textContent = user.email;
     loadRecentTransactions();
   } else {
-    document.getElementById("auth-screen").style.display  = "flex";
+    document.getElementById("auth-screen").style.display = "flex";
     document.getElementById("app-screen").classList.remove("visible");
   }
 });
@@ -209,7 +182,7 @@ auth.onAuthStateChanged(user => {
 
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
-    stopNFC(); // cancel any running NFC
+    stopNFC();
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     btn.classList.add("active");
@@ -220,11 +193,10 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 
 // ─── 7. Registration tab ────────────────────────────────
 
-let pendingRegUID = null; // UID waiting to be confirmed during registration
+let pendingRegUID = null;
 
 document.getElementById("btn-scan-register").addEventListener("click", function() {
   if (nfcAbortController) {
-    // Button acts as cancel when scanning
     stopNFC("scan-reg-label", "סרוק תג NFC לשיוך");
     setNfcStatus("nfc-status-register", "", "");
     return;
@@ -266,21 +238,17 @@ document.getElementById("btn-register-submit").addEventListener("click", async (
       createdBy: currentUser.email
     });
 
-    // Log transaction
     await logTransaction(uid, name, currentUser.email, 0, "רישום תלמיד חדש");
 
-    // Show result card
     const preview = document.getElementById("reg-student-preview");
     preview.innerHTML = studentCardHTML(name, grade, 0);
     document.getElementById("reg-result-card").style.display = "block";
 
-    // Reset form
     document.getElementById("reg-name").value  = "";
     document.getElementById("reg-grade").value = "";
     document.getElementById("reg-uid-manual").value = "";
     pendingRegUID = null;
-    setNfcStatus("nfc-status-register", "success",
-      `✅ ${name} נרשם בהצלחה! UID: ${uid}`);
+    setNfcStatus("nfc-status-register", "success", `✅ ${name} נרשם בהצלחה! UID: ${uid}`);
     showToast(`✅ ${name} נרשם בהצלחה!`, "success");
 
   } catch (err) {
@@ -294,7 +262,6 @@ document.getElementById("btn-register-submit").addEventListener("click", async (
 
 // ─── 8. Teacher tab ─────────────────────────────────────
 
-// Reason chips
 document.querySelectorAll(".chip").forEach(chip => {
   chip.addEventListener("click", () => {
     document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
@@ -305,7 +272,7 @@ document.querySelectorAll(".chip").forEach(chip => {
       customInput.style.display = "block";
       customInput.focus();
     } else {
-      customInput.style.display  = "none";
+      customInput.style.display = "none";
       customInput.value = "";
     }
   });
@@ -376,7 +343,6 @@ document.getElementById("btn-award-points").addEventListener("click", async () =
     await ref.update({ balance: firebase.firestore.FieldValue.increment(points) });
     await logTransaction(activeTeacherUID, s.name, currentUser.email, points, reason);
 
-    // Refresh card preview
     document.getElementById("teacher-student-preview").innerHTML =
       studentCardHTML(s.name, s.grade, newBalance);
 
@@ -431,7 +397,6 @@ async function processPayment(uid) {
   try {
     const studentRef = db.collection("students").doc(uid);
 
-    // ── Firestore runTransaction: atomic balance check + deduct ──
     const result = await db.runTransaction(async txn => {
       const snap = await txn.get(studentRef);
 
@@ -439,9 +404,7 @@ async function processPayment(uid) {
 
       const s = snap.data();
       if (s.balance < cost) {
-        throw new Error(
-          `יתרה לא מספיקה: ${s.balance} נקודות (נדרש: ${cost})`
-        );
+        throw new Error(`יתרה לא מספיקה: ${s.balance} נקודות (נדרש: ${cost})`);
       }
 
       txn.update(studentRef, {
@@ -451,11 +414,8 @@ async function processPayment(uid) {
       return { name: s.name, grade: s.grade, newBalance: s.balance - cost };
     });
 
-    // Log after successful transaction
-    await logTransaction(uid, result.name, currentUser.email, -cost,
-                         `קניה בחנות: ${itemName}`);
+    await logTransaction(uid, result.name, currentUser.email, -cost, `קניה בחנות: ${itemName}`);
 
-    // Show result
     const preview = document.getElementById("store-student-preview");
     preview.innerHTML = studentCardHTML(result.name, result.grade, result.newBalance);
     resultCard.style.display = "block";
@@ -464,7 +424,6 @@ async function processPayment(uid) {
       `✅ תשלום אושר! ${result.name} שילם ${cost} נקודות עבור "${itemName}"`);
     showToast(`✅ תשלום של ${cost} נקודות אושר!`, "success");
 
-    // Clear fields after success
     document.getElementById("store-cost").value  = "";
     document.getElementById("store-item").value  = "";
     document.getElementById("store-uid-manual").value = "";
@@ -480,12 +439,12 @@ async function processPayment(uid) {
   }
 }
 
-// ─── 10. Transactions helper & display ──────────────────
+// ─── 10. Transactions ───────────────────────────────────
 
 async function logTransaction(studentUID, studentName, teacherEmail, amount, description) {
   await db.collection("transactions").add({
-    timestamp:   firebase.firestore.FieldValue.serverTimestamp(),
-    student_uid: studentUID,
+    timestamp:    firebase.firestore.FieldValue.serverTimestamp(),
+    student_uid:  studentUID,
     student_name: studentName,
     teacher_email: teacherEmail,
     amount,
@@ -510,8 +469,8 @@ async function loadRecentTransactions() {
 
     list.innerHTML = "";
     snap.forEach(doc => {
-      const t   = doc.data();
-      const li  = document.createElement("li");
+      const t  = doc.data();
+      const li = document.createElement("li");
       li.className = "tx-item";
       const positive = t.amount >= 0;
       li.innerHTML = `
@@ -530,7 +489,7 @@ async function loadRecentTransactions() {
   }
 }
 
-// ─── 11. PWA Service Worker registration ────────────────
+// ─── 11. PWA Service Worker ─────────────────────────────
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js")
