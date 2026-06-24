@@ -1,6 +1,6 @@
 {
-  "name": "כרטיס בית ספרי",
-  "short_name": "כרטיס ב״ס",
+  "name": "מערכת נקודות אהל שלמה",
+  "short_name": "אהל שלמה",
   "description": "מערכת נקודות ותגמולים לתלמידים בעזרת NFC",
   "start_url": "/",
   "display": "standalone",

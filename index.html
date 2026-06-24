@@ -4,12 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#4F46E5" />
-  <title>כרטיס בית ספרי</title>
+  <title>מערכת נקודות אהל שלמה</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- SheetJS for Excel import -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
-    /* ─── Design tokens ─── */
     :root {
       --c-bg:        #F0F4FF;
       --c-surface:   #FFFFFF;
@@ -25,8 +26,6 @@
       --shadow-sm:   0 1px 4px rgba(0,0,0,.07);
       --transition:  .2s ease;
     }
-
-    /* ─── Reset & base ─── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
     body {
@@ -37,13 +36,11 @@
       line-height: 1.5;
     }
 
-    /* ─── Auth screen ─── */
+    /* ── Auth ── */
     #auth-screen {
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
       padding: 24px;
       background: linear-gradient(140deg, #4F46E5 0%, #7C3AED 100%);
     }
@@ -51,47 +48,50 @@
       background: var(--c-surface);
       border-radius: var(--radius);
       padding: 40px 32px;
-      width: 100%;
-      max-width: 400px;
+      width: 100%; max-width: 400px;
       box-shadow: 0 24px 64px rgba(0,0,0,.18);
     }
-    .auth-logo {
-      text-align: center;
-      margin-bottom: 32px;
-    }
+    .auth-logo { text-align: center; margin-bottom: 28px; }
     .auth-logo .logo-icon {
       width: 64px; height: 64px;
       background: linear-gradient(135deg, #4F46E5, #7C3AED);
       border-radius: 18px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 12px;
-      font-size: 30px;
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-bottom: 12px; font-size: 30px;
     }
-    .auth-logo h1 { font-size: 22px; font-weight: 800; color: var(--c-text); }
+    .auth-logo h1 { font-size: 20px; font-weight: 800; color: var(--c-text); }
     .auth-logo p  { font-size: 13px; color: var(--c-muted); margin-top: 4px; }
 
-    /* ─── App shell ─── */
+    /* Google sign-in button */
+    .btn-google {
+      width: 100%; padding: 12px;
+      background: #fff; border: 1.5px solid var(--c-border);
+      border-radius: 12px; cursor: pointer;
+      font-family: 'Heebo', sans-serif; font-size: 14px; font-weight: 700;
+      color: var(--c-text); display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: var(--transition); margin-bottom: 4px;
+    }
+    .btn-google:hover { background: #F9FAFB; border-color: #9CA3AF; }
+    .btn-google img { width: 20px; height: 20px; }
+    .auth-divider {
+      display: flex; align-items: center; gap: 10px;
+      margin: 16px 0; color: var(--c-muted); font-size: 12px;
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--c-border);
+    }
+
+    /* ── App shell ── */
     #app-screen { display: none; min-height: 100vh; flex-direction: column; }
     #app-screen.visible { display: flex; }
-
-    /* Top bar */
     .topbar {
-      background: var(--c-surface);
-      border-bottom: 1px solid var(--c-border);
-      padding: 0 20px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: var(--shadow-sm);
+      background: var(--c-surface); border-bottom: 1px solid var(--c-border);
+      padding: 0 20px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-sm);
     }
-    .topbar-brand { font-size: 17px; font-weight: 800; color: var(--c-primary); }
-    .topbar-user  { font-size: 12px; color: var(--c-muted); text-align: left; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .topbar-brand { font-size: 15px; font-weight: 800; color: var(--c-primary); }
+    .topbar-user  { font-size: 12px; color: var(--c-muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .btn-logout {
       background: none; border: none; cursor: pointer;
       color: var(--c-muted); font-size: 13px; padding: 6px 10px;
@@ -100,103 +100,75 @@
     .btn-logout:hover { background: var(--c-bg); color: var(--c-danger); }
 
     /* Tab nav */
-    .tab-nav {
-      display: flex;
-      background: var(--c-surface);
-      border-bottom: 1px solid var(--c-border);
-    }
+    .tab-nav { display: flex; background: var(--c-surface); border-bottom: 1px solid var(--c-border); overflow-x: auto; }
     .tab-btn {
-      flex: 1; padding: 14px 8px 12px;
+      flex: 1; min-width: 64px; padding: 12px 6px 10px;
       border: none; background: none; cursor: pointer;
-      font-family: 'Heebo', sans-serif;
-      font-size: 13px; font-weight: 600; color: var(--c-muted);
-      border-bottom: 3px solid transparent;
-      transition: var(--transition);
+      font-family: 'Heebo', sans-serif; font-size: 11px; font-weight: 600; color: var(--c-muted);
+      border-bottom: 3px solid transparent; transition: var(--transition); white-space: nowrap;
     }
     .tab-btn.active { color: var(--c-primary); border-bottom-color: var(--c-primary); }
-    .tab-btn .tab-icon { display: block; font-size: 20px; margin-bottom: 2px; }
+    .tab-btn .tab-icon { display: block; font-size: 18px; margin-bottom: 2px; }
 
-    /* Content area */
-    .tab-content { display: none; padding: 20px; max-width: 600px; margin: 0 auto; width: 100%; }
+    .tab-content { display: none; padding: 20px; max-width: 640px; margin: 0 auto; width: 100%; }
     .tab-content.active { display: block; }
 
-    /* ─── Shared components ─── */
+    /* ── Shared components ── */
     .card {
-      background: var(--c-surface);
-      border-radius: var(--radius);
-      padding: 20px;
-      box-shadow: var(--shadow-sm);
-      margin-bottom: 16px;
+      background: var(--c-surface); border-radius: var(--radius);
+      padding: 20px; box-shadow: var(--shadow-sm); margin-bottom: 16px;
     }
     .card-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: var(--c-text); }
-    .card-title .emoji { margin-left: 6px; }
 
     label { display: block; font-size: 13px; font-weight: 600; color: var(--c-muted); margin-bottom: 6px; }
     input[type="text"], input[type="email"], input[type="password"], input[type="number"], select, textarea {
       width: 100%; padding: 11px 14px;
-      border: 1.5px solid var(--c-border);
-      border-radius: 10px; font-size: 14px;
-      font-family: 'Heebo', sans-serif;
+      border: 1.5px solid var(--c-border); border-radius: 10px;
+      font-size: 14px; font-family: 'Heebo', sans-serif;
       color: var(--c-text); background: var(--c-surface);
-      transition: border-color var(--transition);
-      outline: none;
+      transition: border-color var(--transition); outline: none;
     }
-    input:focus, select:focus, textarea:focus { border-color: var(--c-primary); }
+    input:focus, select:focus { border-color: var(--c-primary); }
     .form-group { margin-bottom: 14px; }
 
     .btn {
-      width: 100%; padding: 13px;
-      border: none; border-radius: 12px;
-      font-family: 'Heebo', sans-serif;
-      font-size: 15px; font-weight: 700;
+      width: 100%; padding: 13px; border: none; border-radius: 12px;
+      font-family: 'Heebo', sans-serif; font-size: 15px; font-weight: 700;
       cursor: pointer; transition: var(--transition);
       display: flex; align-items: center; justify-content: center; gap: 8px;
     }
-    .btn-primary   { background: var(--c-primary);   color: #fff; }
-    .btn-primary:hover   { background: var(--c-primary-d); }
-    .btn-success   { background: var(--c-accent);    color: #fff; }
-    .btn-success:hover   { filter: brightness(1.05); }
-    .btn-danger    { background: var(--c-danger);    color: #fff; }
-    .btn-danger:hover    { filter: brightness(1.05); }
-    .btn-outline   { background: transparent; border: 2px solid var(--c-primary); color: var(--c-primary); }
-    .btn-outline:hover   { background: var(--c-primary); color: #fff; }
-    .btn:disabled  { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: var(--c-primary); color: #fff; }
+    .btn-primary:hover { background: var(--c-primary-d); }
+    .btn-success { background: var(--c-accent); color: #fff; }
+    .btn-success:hover { filter: brightness(1.05); }
+    .btn-danger  { background: var(--c-danger); color: #fff; }
+    .btn-danger:hover  { filter: brightness(1.05); }
+    .btn-outline { background: transparent; border: 2px solid var(--c-primary); color: var(--c-primary); }
+    .btn-outline:hover { background: var(--c-primary); color: #fff; }
+    .btn-outline-danger { background: transparent; border: 2px solid var(--c-danger); color: var(--c-danger); }
+    .btn-outline-danger:hover { background: var(--c-danger); color: #fff; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
     .btn-sm { width: auto; padding: 8px 16px; font-size: 13px; border-radius: 8px; }
 
-    /* NFC pulse button */
-    .nfc-btn-wrap { position: relative; display: flex; justify-content: center; margin: 8px 0; }
-    .nfc-pulse-ring {
-      position: absolute; inset: -6px;
-      border-radius: 50%; border: 3px solid var(--c-primary);
-      opacity: 0; animation: none;
-    }
-    .nfc-pulse-ring.scanning { animation: pulse-ring 1.4s ease-out infinite; }
-    @keyframes pulse-ring {
-      0%   { transform: scale(.9); opacity: .7; }
-      100% { transform: scale(1.5); opacity: 0; }
-    }
     .btn-nfc {
       width: 100%; padding: 16px;
       background: linear-gradient(135deg, var(--c-primary), #7C3AED);
       color: #fff; border: none; border-radius: 14px;
       font-family: 'Heebo', sans-serif; font-size: 16px; font-weight: 700;
-      cursor: pointer; display: flex; align-items: center;
-      justify-content: center; gap: 10px; transition: var(--transition);
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: var(--transition);
     }
     .btn-nfc:disabled { opacity: .5; cursor: not-allowed; }
     .btn-nfc .nfc-icon { font-size: 22px; }
 
-    /* NFC status badge */
     .nfc-status {
-      text-align: center; padding: 10px;
-      border-radius: 10px; font-size: 13px; font-weight: 600;
-      margin-top: 10px; display: none;
+      text-align: center; padding: 10px; border-radius: 10px;
+      font-size: 13px; font-weight: 600; margin-top: 10px; display: none;
     }
     .nfc-status.scanning { display: block; background: #EEF2FF; color: var(--c-primary); }
     .nfc-status.success  { display: block; background: #D1FAE5; color: #065F46; }
     .nfc-status.error    { display: block; background: #FEE2E2; color: #991B1B; }
 
-    /* Student card preview */
     .student-preview {
       border-radius: var(--radius); padding: 18px 20px;
       background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
@@ -211,12 +183,60 @@
     .sp-balance { font-size: 36px; font-weight: 800; line-height: 1; }
     .sp-unit    { font-size: 14px; opacity: .85; margin-bottom: 4px; }
 
-    /* Transaction list */
+    /* Students table */
+    .students-toolbar {
+      display: flex; gap: 10px; align-items: center;
+      margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .search-input {
+      flex: 1; min-width: 160px; padding: 9px 14px;
+      border: 1.5px solid var(--c-border); border-radius: 10px;
+      font-size: 13px; font-family: 'Heebo', sans-serif; outline: none;
+    }
+    .search-input:focus { border-color: var(--c-primary); }
+    .students-table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: right; padding: 10px 12px;
+      background: var(--c-bg); color: var(--c-muted);
+      font-weight: 700; font-size: 11px; border-bottom: 1px solid var(--c-border);
+      white-space: nowrap;
+    }
+    td { padding: 11px 12px; border-bottom: 1px solid var(--c-border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #F9FAFB; }
+    .badge-balance {
+      display: inline-block; padding: 3px 10px;
+      background: #EEF2FF; color: var(--c-primary);
+      border-radius: 100px; font-weight: 700; font-size: 13px;
+    }
+    .btn-delete-student {
+      background: none; border: none; cursor: pointer;
+      color: var(--c-muted); font-size: 16px; padding: 4px 8px;
+      border-radius: 6px; transition: var(--transition);
+    }
+    .btn-delete-student:hover { color: var(--c-danger); background: #FEE2E2; }
+
+    /* Excel upload */
+    .upload-zone {
+      border: 2px dashed var(--c-border); border-radius: 12px;
+      padding: 24px; text-align: center; cursor: pointer;
+      transition: var(--transition); color: var(--c-muted); font-size: 13px;
+    }
+    .upload-zone:hover { border-color: var(--c-primary); color: var(--c-primary); background: #EEF2FF; }
+    .upload-zone input { display: none; }
+    .upload-zone .upload-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+    /* Import preview table */
+    #import-preview { display: none; margin-top: 14px; }
+    #import-preview table { font-size: 12px; }
+    #import-preview th, #import-preview td { padding: 7px 10px; }
+
+    /* Tx list */
     .tx-list { list-style: none; }
     .tx-item {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 11px 0; border-bottom: 1px solid var(--c-border);
-      font-size: 13px;
+      padding: 11px 0; border-bottom: 1px solid var(--c-border); font-size: 13px;
     }
     .tx-item:last-child { border-bottom: none; }
     .tx-desc { color: var(--c-text); font-weight: 500; }
@@ -224,6 +244,32 @@
     .tx-amount { font-weight: 700; font-size: 15px; }
     .tx-amount.positive { color: var(--c-accent); }
     .tx-amount.negative { color: var(--c-danger); }
+
+    /* Chips */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .chip {
+      padding: 6px 14px; border-radius: 100px;
+      border: 1.5px solid var(--c-border); font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: var(--transition); color: var(--c-muted); background: var(--c-surface);
+    }
+    .chip.active { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 500; padding: 24px;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: var(--c-surface); border-radius: var(--radius);
+      padding: 28px; width: 100%; max-width: 360px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.2);
+    }
+    .modal h3 { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
+    .modal p  { font-size: 14px; color: var(--c-muted); margin-bottom: 20px; }
+    .modal-actions { display: flex; gap: 10px; }
+    .modal-actions .btn { flex: 1; padding: 11px; font-size: 14px; }
 
     /* Toast */
     #toast {
@@ -233,40 +279,23 @@
       z-index: 999; transition: transform .3s cubic-bezier(.34,1.56,.64,1);
       white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,.25);
     }
-    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.show    { transform: translateX(-50%) translateY(0); }
     #toast.success { background: #065F46; }
     #toast.error   { background: #991B1B; }
 
-    /* Divider */
     .divider {
       display: flex; align-items: center; gap: 10px;
       margin: 16px 0; color: var(--c-muted); font-size: 12px;
     }
-    .divider::before, .divider::after {
-      content: ''; flex: 1; height: 1px; background: var(--c-border);
-    }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--c-border); }
 
-    /* Spinner */
     .spinner {
       width: 18px; height: 18px;
-      border: 2px solid rgba(255,255,255,.35);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
+      border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Reason chips */
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-    .chip {
-      padding: 6px 14px; border-radius: 100px;
-      border: 1.5px solid var(--c-border);
-      font-size: 12px; font-weight: 600; cursor: pointer;
-      transition: var(--transition); color: var(--c-muted); background: var(--c-surface);
-    }
-    .chip.active { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
-
-    /* Misc */
     .text-center { text-align: center; }
     .text-muted  { color: var(--c-muted); font-size: 13px; }
     .mt-8  { margin-top: 8px; }
@@ -275,10 +304,9 @@
     .row   { display: flex; gap: 12px; }
     .row > * { flex: 1; }
 
-    /* Responsive */
     @media (max-width: 400px) {
       .auth-card { padding: 28px 20px; }
-      .tab-btn   { font-size: 11px; }
+      .tab-btn   { font-size: 10px; }
     }
   </style>
 </head>
@@ -289,9 +317,18 @@
   <div class="auth-card">
     <div class="auth-logo">
       <div class="logo-icon">🏫</div>
-      <h1>כרטיס בית ספרי</h1>
+      <h1>מערכת נקודות אהל שלמה</h1>
       <p>מערכת נקודות ותגמולים לתלמידים</p>
     </div>
+
+    <!-- Google sign-in -->
+    <button class="btn-google" id="btn-google-login">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+      כניסה עם חשבון Google
+    </button>
+
+    <div class="auth-divider">או עם אימייל וסיסמה</div>
+
     <div class="form-group">
       <label for="auth-email">אימייל</label>
       <input type="email" id="auth-email" placeholder="teacher@school.edu" autocomplete="username" />
@@ -311,7 +348,7 @@
 <div id="app-screen">
 
   <div class="topbar">
-    <span class="topbar-brand">🏫 כרטיס בית ספרי</span>
+    <span class="topbar-brand">🏫 אהל שלמה</span>
     <div style="display:flex;align-items:center;gap:8px">
       <span class="topbar-user" id="user-email-display"></span>
       <button class="btn-logout" id="btn-logout">יציאה</button>
@@ -328,13 +365,15 @@
     <button class="tab-btn" data-tab="store">
       <span class="tab-icon">🛒</span>חנות
     </button>
+    <button class="tab-btn" data-tab="students">
+      <span class="tab-icon">👥</span>תלמידים
+    </button>
   </nav>
 
   <!-- ── TAB: Register ── -->
   <div class="tab-content active" id="tab-register">
-
     <div class="card">
-      <p class="card-title"><span class="emoji">➕</span>רישום תלמיד חדש</p>
+      <p class="card-title">➕ רישום תלמיד חדש</p>
       <div class="row">
         <div class="form-group">
           <label for="reg-name">שם מלא</label>
@@ -351,13 +390,11 @@
           </select>
         </div>
       </div>
-
       <button class="btn-nfc" id="btn-scan-register">
         <span class="nfc-icon">📡</span>
         <span id="scan-reg-label">סרוק תג NFC לשיוך</span>
       </button>
       <p id="nfc-status-register" class="nfc-status"></p>
-
       <div class="divider">או הזן UID ידנית</div>
       <div class="form-group">
         <label for="reg-uid-manual">UID תג NFC (ידני)</label>
@@ -365,25 +402,21 @@
       </div>
       <button class="btn btn-primary" id="btn-register-submit">רשום תלמיד</button>
     </div>
-
     <div class="card" id="reg-result-card" style="display:none">
-      <p class="card-title"><span class="emoji">✅</span>תלמיד נרשם בהצלחה</p>
+      <p class="card-title">✅ תלמיד נרשם בהצלחה</p>
       <div class="student-preview visible" id="reg-student-preview"></div>
     </div>
-
   </div>
 
   <!-- ── TAB: Teacher ── -->
   <div class="tab-content" id="tab-teacher">
-
     <div class="card">
-      <p class="card-title"><span class="emoji">📡</span>זיהוי תלמיד</p>
+      <p class="card-title">📡 זיהוי תלמיד</p>
       <button class="btn-nfc" id="btn-scan-teacher">
         <span class="nfc-icon">📡</span>
         <span id="scan-teacher-label">הצמד כרטיס לזיהוי</span>
       </button>
       <p id="nfc-status-teacher" class="nfc-status"></p>
-
       <div class="divider">או הזן UID ידנית</div>
       <div class="form-group">
         <label for="teacher-uid-manual">UID תג NFC</label>
@@ -394,9 +427,8 @@
 
     <div id="teacher-student-section" style="display:none">
       <div class="student-preview visible" id="teacher-student-preview"></div>
-
       <div class="card mt-16">
-        <p class="card-title"><span class="emoji">⭐</span>הענק נקודות</p>
+        <p class="card-title">⭐ הענק נקודות</p>
         <div class="form-group">
           <label>כמות נקודות</label>
           <input type="number" id="teacher-points" min="1" max="500" placeholder="למשל: 10" />
@@ -416,14 +448,12 @@
         <button class="btn btn-success" id="btn-award-points">הענק נקודות ✨</button>
       </div>
     </div>
-
   </div>
 
   <!-- ── TAB: Store ── -->
   <div class="tab-content" id="tab-store">
-
     <div class="card">
-      <p class="card-title"><span class="emoji">🛒</span>תשלום בחנות</p>
+      <p class="card-title">🛒 תשלום בחנות</p>
       <div class="form-group">
         <label for="store-cost">עלות המוצר (נקודות)</label>
         <input type="number" id="store-cost" min="1" placeholder="למשל: 25" />
@@ -432,13 +462,11 @@
         <label for="store-item">תיאור המוצר</label>
         <input type="text" id="store-item" placeholder="למשל: עיפרון שחור" />
       </div>
-
       <button class="btn-nfc" id="btn-scan-store">
         <span class="nfc-icon">📡</span>
         <span id="scan-store-label">הצמד כרטיס לתשלום</span>
       </button>
       <p id="nfc-status-store" class="nfc-status"></p>
-
       <div class="divider">או הזן UID ידנית</div>
       <div class="form-group">
         <label for="store-uid-manual">UID תג NFC</label>
@@ -446,24 +474,89 @@
       </div>
       <button class="btn btn-outline btn-sm" id="btn-store-manual-pay">שלם עם UID ידני</button>
     </div>
-
     <div class="card" id="store-result-card" style="display:none">
       <div class="student-preview visible" id="store-student-preview"></div>
     </div>
-
     <div class="card">
-      <p class="card-title"><span class="emoji">📋</span>עסקאות אחרונות</p>
+      <p class="card-title">📋 עסקאות אחרונות</p>
       <ul class="tx-list" id="tx-list"><li class="text-muted">טוען...</li></ul>
     </div>
-
   </div>
 
+  <!-- ── TAB: Students ── -->
+  <div class="tab-content" id="tab-students">
+
+    <!-- Excel import -->
+    <div class="card">
+      <p class="card-title">📥 ייבוא תלמידים מאקסל</p>
+      <p class="text-muted" style="margin-bottom:14px">
+        העלה קובץ Excel עם עמודות: <strong>שם</strong> ו-<strong>כיתה</strong> (אופציונלי: <strong>נקודות</strong>).
+        תלמידים עם UID יוכלו לשויך לתג NFC לאחר מכן.
+      </p>
+      <label class="upload-zone" id="excel-upload-zone">
+        <span class="upload-icon">📊</span>
+        לחץ לבחירת קובץ Excel (.xlsx / .xls)
+        <input type="file" id="excel-file-input" accept=".xlsx,.xls" />
+      </label>
+      <div id="import-preview">
+        <p style="font-size:13px;font-weight:700;margin-bottom:8px" id="import-preview-count"></p>
+        <div class="students-table-wrap">
+          <table id="import-preview-table">
+            <thead><tr><th>#</th><th>שם</th><th>כיתה</th><th>נקודות</th></tr></thead>
+            <tbody id="import-preview-body"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button class="btn btn-success" id="btn-import-confirm">ייבא לכל התלמידים ✅</button>
+          <button class="btn btn-outline btn-sm" id="btn-import-cancel" style="width:auto;padding:11px 20px">ביטול</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Students list -->
+    <div class="card">
+      <p class="card-title">👥 כל התלמידים</p>
+      <div class="students-toolbar">
+        <input class="search-input" type="text" id="students-search" placeholder="🔍 חיפוש לפי שם או כיתה..." />
+        <button class="btn btn-outline btn-sm" id="btn-refresh-students">רענן</button>
+      </div>
+      <div class="students-table-wrap">
+        <table id="students-table">
+          <thead>
+            <tr>
+              <th>שם</th>
+              <th>כיתה</th>
+              <th>נקודות</th>
+              <th>עדכון אחרון</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="students-tbody">
+            <tr><td colspan="5" class="text-muted text-center" style="padding:20px">טוען...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="students-count" class="text-muted" style="margin-top:10px;font-size:12px"></p>
+    </div>
+  </div>
+
+</div><!-- /app-screen -->
+
+<!-- ── Delete confirm modal ── -->
+<div class="modal-overlay hidden" id="delete-modal">
+  <div class="modal">
+    <h3>🗑️ מחיקת תלמיד</h3>
+    <p id="delete-modal-text">האם למחוק את התלמיד? פעולה זו בלתי הפיכה.</p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btn-confirm-delete">כן, מחק</button>
+      <button class="btn btn-outline" id="btn-cancel-delete">ביטול</button>
+    </div>
+  </div>
 </div>
 
-<!-- Toast -->
 <div id="toast"></div>
 
-<!-- Firebase SDK (compat mode — works inline without bundler) -->
+<!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
