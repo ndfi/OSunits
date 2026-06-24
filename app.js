@@ -412,12 +412,16 @@ async function loadStudents() {
   const tbody = document.getElementById("students-tbody");
   tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center" style="padding:20px">טוען...</td></tr>';
   try {
-    const snap = await db.collection("students").orderBy("name").get();
+    // ללא orderBy — ממיינים בצד הלקוח כדי למנוע שגיאת Firestore Index
+    const snap = await db.collection("students").get();
     allStudents = [];
     snap.forEach(doc => allStudents.push({ uid: doc.id, ...doc.data() }));
+    // מיון לפי שם בעברית
+    allStudents.sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
     renderStudentsTable(document.getElementById("students-search").value.trim());
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center">שגיאה: ${err.message}</td></tr>`;
+    console.error("loadStudents error:", err);
+    tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center" style="padding:20px;color:red">שגיאה: ${err.message}</td></tr>`;
   }
 }
 
